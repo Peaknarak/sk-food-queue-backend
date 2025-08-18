@@ -1,9 +1,4 @@
-// ==============================
-// Prisma schema for PostgreSQL
-// รองรับฟีเจอร์ในโค้ด: Users, Vendors, MenuItems,
-// Orders, OrderItems, Messages (แชท), QueueCounter
-// ==============================
-
+// server/prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,14 +8,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ------------------------------
-// ENUMS
-// ------------------------------
-enum UserType {
-  student
-  vendor
-}
-
 enum OrderStatus {
   created
   pending_vendor_confirmation
@@ -28,98 +15,92 @@ enum OrderStatus {
   rejected
 }
 
-// ------------------------------
-// MODELS
-// ------------------------------
 model User {
-  id        String   @id            // ใช้ studentId หรือ vendorId เป็นคีย์
-  type      UserType
-  name      String
+  id    String @id
+  type  String   // 'student' | 'vendor'
+  name  String
 
-  // ถ้าเป็นผู้ขาย อาจจะมี vendorId (nullable)
-  vendorId  String?
-  vendor    Vendor?  @relation(fields: [vendorId], references: [id])
+  // ถ้าเป็นผู้ขาย จะมีการอ้างถึงร้าน
+  vendorId String?
+  vendor   Vendor? @relation(fields: [vendorId], references: [id])
 
-  // ไม่ได้บังคับใช้ relation orders กับ user เพื่อความยืดหยุ่น
-  // (เรา query ด้วย studentId/vendorId ตรง ๆ จาก Order)
+  // ออเดอร์ที่นักเรียนสร้าง
+  studentOrders Order[] @relation("StudentOrders")
 
-  @@index([type])
-  @@index([vendorId])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Vendor {
-  id          String      @id
-  name        String
+  id   String @id
+  name String
 
-  menus       MenuItem[]
-  orders      Order[]
-  queue       QueueCounter?
+  // back-relation ของ User.vendor (ไม่ต้องมี foreign key ที่ฝั่งนี้)
+  users User[]
 
-  @@index([name])
+  menus  MenuItem[]
+  orders Order[]
+  queue  QueueCounter?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model MenuItem {
-  id        String   @id
-  vendorId  String
-  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  name      String
-  price     Int      // ราคาเป็นหน่วยสตางค์/บาทก็ได้ ตามโค้ดคุณใช้เป็นจำนวนเต็ม
+  id       String  @id
+  vendorId String
+  vendor   Vendor  @relation(fields: [vendorId], references: [id])
 
-  @@index([vendorId])
-  @@index([name])
+  name  String
+  price Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Order {
-  id         String        @id
-  studentId  String
-  vendorId   String
-  vendor     Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  id        String      @id
+  studentId String
+  vendorId  String
 
-  total      Int
-  status     OrderStatus   @default(created)
+  // ผู้สั่ง (นักเรียน)
+  student User   @relation("StudentOrders", fields: [studentId], references: [id])
+  // ร้านที่รับออเดอร์
+  vendor  Vendor @relation(fields: [vendorId], references: [id])
+
+  status      OrderStatus @default(created)
+  total       Int
   queueNumber Int?
+  paidAt      DateTime?
+  createdAt   DateTime    @default(now())
 
-  createdAt  DateTime      @default(now())
-  paidAt     DateTime?
-
-  items      OrderItem[]
-  messages   Message[]
-
-  @@index([studentId, createdAt])
-  @@index([vendorId, createdAt])
-  @@index([status])
+  items OrderItem[]
+  messages Message[]
 }
 
 model OrderItem {
-  id         String  @id
+  id         String @id
   orderId    String
-  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order      Order  @relation(fields: [orderId], references: [id])
 
-  // เก็บซ้ำเพื่อ snapshot ตอนสั่งซื้อ
   menuItemId String
   name       String
   price      Int
   qty        Int
-
-  @@index([orderId])
-  @@index([menuItemId])
 }
 
 model Message {
-  id       String   @id
-  orderId  String
-  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id      String   @id
+  orderId String
+  order   Order    @relation(fields: [orderId], references: [id])
 
-  from     String   // userId ของผู้ส่ง
-  text     String
-  ts       DateTime @default(now())
-
-  @@index([orderId, ts])
+  from String
+  text String
+  ts   DateTime @default(now())
 }
 
 model QueueCounter {
-  // 1:1 กับ Vendor โดยใช้ vendorId เป็น PK
   vendorId String   @id
-  vendor   Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor   Vendor   @relation(fields: [vendorId], references: [id])
   current  Int      @default(0)
 }
