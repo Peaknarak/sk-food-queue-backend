@@ -1,0 +1,125 @@
+// ==============================
+// Prisma schema for PostgreSQL
+// รองรับฟีเจอร์ในโค้ด: Users, Vendors, MenuItems,
+// Orders, OrderItems, Messages (แชท), QueueCounter
+// ==============================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------
+// ENUMS
+// ------------------------------
+enum UserType {
+  student
+  vendor
+}
+
+enum OrderStatus {
+  created
+  pending_vendor_confirmation
+  accepted
+  rejected
+}
+
+// ------------------------------
+// MODELS
+// ------------------------------
+model User {
+  id        String   @id            // ใช้ studentId หรือ vendorId เป็นคีย์
+  type      UserType
+  name      String
+
+  // ถ้าเป็นผู้ขาย อาจจะมี vendorId (nullable)
+  vendorId  String?
+  vendor    Vendor?  @relation(fields: [vendorId], references: [id])
+
+  // ไม่ได้บังคับใช้ relation orders กับ user เพื่อความยืดหยุ่น
+  // (เรา query ด้วย studentId/vendorId ตรง ๆ จาก Order)
+
+  @@index([type])
+  @@index([vendorId])
+}
+
+model Vendor {
+  id          String      @id
+  name        String
+
+  menus       MenuItem[]
+  orders      Order[]
+  queue       QueueCounter?
+
+  @@index([name])
+}
+
+model MenuItem {
+  id        String   @id
+  vendorId  String
+  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  name      String
+  price     Int      // ราคาเป็นหน่วยสตางค์/บาทก็ได้ ตามโค้ดคุณใช้เป็นจำนวนเต็ม
+
+  @@index([vendorId])
+  @@index([name])
+}
+
+model Order {
+  id         String        @id
+  studentId  String
+  vendorId   String
+  vendor     Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  total      Int
+  status     OrderStatus   @default(created)
+  queueNumber Int?
+
+  createdAt  DateTime      @default(now())
+  paidAt     DateTime?
+
+  items      OrderItem[]
+  messages   Message[]
+
+  @@index([studentId, createdAt])
+  @@index([vendorId, createdAt])
+  @@index([status])
+}
+
+model OrderItem {
+  id         String  @id
+  orderId    String
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // เก็บซ้ำเพื่อ snapshot ตอนสั่งซื้อ
+  menuItemId String
+  name       String
+  price      Int
+  qty        Int
+
+  @@index([orderId])
+  @@index([menuItemId])
+}
+
+model Message {
+  id       String   @id
+  orderId  String
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  from     String   // userId ของผู้ส่ง
+  text     String
+  ts       DateTime @default(now())
+
+  @@index([orderId, ts])
+}
+
+model QueueCounter {
+  // 1:1 กับ Vendor โดยใช้ vendorId เป็น PK
+  vendorId String   @id
+  vendor   Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  current  Int      @default(0)
+}
