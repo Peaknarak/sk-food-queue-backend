@@ -3,37 +3,33 @@ require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log('Seeding...');
-
-  // สร้างผู้ใช้ตัวอย่าง
+async function main(){
+  // สร้าง admin (ถ้ายังไม่มี)
   await prisma.user.upsert({
-    where: { id: 's12345' },
+    where: { id: 'admin' },
     update: {},
-    create: { id: 's12345', type: 'student', name: 'Student 12345' }
-  });
-  await prisma.user.upsert({
-    where: { id: 'v001' },
-    update: {},
-    create: { id: 'v001', type: 'vendor', name: 'Vendor v001', vendorId: 'v001' }
+    create: { id: 'admin', name: 'Administrator', role: 'admin' },
   });
 
-  // สร้างร้าน (ยังไม่อนุมัติ 1 ร้าน / อนุมัติ 1 ร้าน)
-  await prisma.vendor.upsert({ where: { id: 'v001' }, update: {}, create: { id: 'v001', name: 'ร้านโกปี๊', approved: true } });
-  await prisma.vendor.upsert({ where: { id: 'v002' }, update: {}, create: { id: 'v002', name: 'ร้านข้าวมันไก่', approved: false } });
+  // ตัวอย่าง Vendor อนุมัติแล้ว
+  await prisma.vendor.upsert({
+    where: { id: 'V001' },
+    update: { approved: true },
+    create: { id: 'V001', name: 'Thai Kitchen', approved: true },
+  });
 
-  // เมนูของ v001 (อันหนึ่ง approved, อันหนึ่ง pending)
+  // เมนูตัวอย่าง
   await prisma.menuItem.upsert({
-    where: { id: 'mnu_demo1' },
+    where: { id: 'm_demo_padthai' },
     update: {},
-    create: { id: 'mnu_demo1', vendorId: 'v001', name: 'ข้าวหมูแดง', price: 45, approved: true }
+    create: { id: 'm_demo_padthai', vendorId: 'V001', name: 'ผัดไท', price: 45 },
   });
   await prisma.menuItem.upsert({
-    where: { id: 'mnu_demo2' },
+    where: { id: 'm_demo_krapao' },
     update: {},
-    create: { id: 'mnu_demo2', vendorId: 'v001', name: 'บะหมี่เกี๊ยว', price: 50, approved: false }
+    create: { id: 'm_demo_krapao', vendorId: 'V001', name: 'กะเพราไก่', price: 40 },
   });
 
-  console.log('Done.');
+  console.log('Seed complete');
 }
-main().finally(() => prisma.$disconnect());
+main().finally(()=> prisma.$disconnect());
