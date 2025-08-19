@@ -1,13 +1,14 @@
 // server/prisma/schema.prisma
-generator client {
-  provider = "prisma-client-js"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+generator client {
+  provider = "prisma-client-js"
+}
+
+/* ===== Enums ===== */
 enum OrderStatus {
   created
   pending_vendor_confirmation
@@ -15,66 +16,44 @@ enum OrderStatus {
   rejected
 }
 
+/* ===== Models ===== */
 model User {
-  id    String @id
-  type  String   // 'student' | 'vendor'
-  name  String
-
-  // ถ้าเป็นผู้ขาย จะมีการอ้างถึงร้าน
-  vendorId String?
-  vendor   Vendor? @relation(fields: [vendorId], references: [id])
-
-  // ออเดอร์ที่นักเรียนสร้าง
-  studentOrders Order[] @relation("StudentOrders")
-
+  id        String   @id
+  type      String   // 'student' | 'vendor'
+  name      String
+  vendorId  String?  // ใส่เฉพาะถ้าเป็นผู้ขาย (id ร้าน = id ผู้ใช้ผู้ขาย)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model Vendor {
-  id   String @id
-  name String
-
-  // back-relation ของ User.vendor (ไม่ต้องมี foreign key ที่ฝั่งนี้)
-  users User[]
-
-  menus  MenuItem[]
-  orders Order[]
-  queue  QueueCounter?
-
+  id        String   @id
+  name      String
+  approved  Boolean  @default(false)
+  menus     MenuItem[]
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model MenuItem {
-  id       String  @id
-  vendorId String
-  vendor   Vendor  @relation(fields: [vendorId], references: [id])
-
-  name  String
-  price Int
-
+  id        String   @id
+  vendorId  String
+  vendor    Vendor   @relation(fields: [vendorId], references: [id])
+  name      String
+  price     Int
+  approved  Boolean  @default(false)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model Order {
-  id        String      @id
-  studentId String
-  vendorId  String
-
-  // ผู้สั่ง (นักเรียน)
-  student User   @relation("StudentOrders", fields: [studentId], references: [id])
-  // ร้านที่รับออเดอร์
-  vendor  Vendor @relation(fields: [vendorId], references: [id])
-
-  status      OrderStatus @default(created)
-  total       Int
+  id         String      @id
+  studentId  String
+  vendorId   String
+  total      Int
+  status     OrderStatus
   queueNumber Int?
-  paidAt      DateTime?
-  createdAt   DateTime    @default(now())
+  createdAt  DateTime    @default(now())
+  paidAt     DateTime?
 
-  items OrderItem[]
+  items    OrderItem[]
   messages Message[]
 }
 
@@ -82,25 +61,22 @@ model OrderItem {
   id         String @id
   orderId    String
   order      Order  @relation(fields: [orderId], references: [id])
-
   menuItemId String
   name       String
   price      Int
   qty        Int
 }
 
+model QueueCounter {
+  vendorId String @id
+  current  Int    @default(0)
+}
+
 model Message {
   id      String   @id
   orderId String
   order   Order    @relation(fields: [orderId], references: [id])
-
-  from String
-  text String
-  ts   DateTime @default(now())
-}
-
-model QueueCounter {
-  vendorId String   @id
-  vendor   Vendor   @relation(fields: [vendorId], references: [id])
-  current  Int      @default(0)
+  from    String
+  text    String
+  ts      DateTime @default(now())
 }

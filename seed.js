@@ -1,58 +1,39 @@
 // server/seed.js
+require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-function id(prefix) { return prefix + Math.random().toString(36).slice(2,8); }
+async function main() {
+  console.log('Seeding...');
 
-async function main(){
-  // Users
+  // สร้างผู้ใช้ตัวอย่าง
   await prisma.user.upsert({
-    where: { id: 'S12345' },
+    where: { id: 's12345' },
     update: {},
-    create: { id: 'S12345', type: 'student', name: 'Student 12345' }
+    create: { id: 's12345', type: 'student', name: 'Student 12345' }
   });
   await prisma.user.upsert({
-    where: { id: 'V001' },
+    where: { id: 'v001' },
     update: {},
-    create: { id: 'V001', type: 'vendor', name: 'Vendor 001', vendorId: 'V001' }
+    create: { id: 'v001', type: 'vendor', name: 'Vendor v001', vendorId: 'v001' }
   });
 
-  // Vendors
-  await prisma.vendor.upsert({
-    where: { id: 'V001' },
-    update: { name: 'Cafeteria A' },
-    create: { id: 'V001', name: 'Cafeteria A' }
-  });
-  await prisma.vendor.upsert({
-    where: { id: 'V002' },
-    update: { name: 'Noodle Station' },
-    create: { id: 'V002', name: 'Noodle Station' }
-  });
+  // สร้างร้าน (ยังไม่อนุมัติ 1 ร้าน / อนุมัติ 1 ร้าน)
+  await prisma.vendor.upsert({ where: { id: 'v001' }, update: {}, create: { id: 'v001', name: 'ร้านโกปี๊', approved: true } });
+  await prisma.vendor.upsert({ where: { id: 'v002' }, update: {}, create: { id: 'v002', name: 'ร้านข้าวมันไก่', approved: false } });
 
-  // Menu items
-  const menus = [
-    { id: 'M001', vendorId: 'V001', name: 'Fried Rice', price: 40 },
-    { id: 'M002', vendorId: 'V001', name: 'Basil Chicken', price: 45 },
-    { id: 'M101', vendorId: 'V002', name: 'Beef Noodle', price: 55 },
-    { id: 'M102', vendorId: 'V002', name: 'Tom Yum Noodle', price: 50 },
-  ];
-  for (const m of menus){
-    await prisma.menuItem.upsert({ where: { id: m.id }, update: m, create: m });
-  }
-
-  // Queue counters
-  await prisma.queueCounter.upsert({
-    where: { vendorId: 'V001' },
+  // เมนูของ v001 (อันหนึ่ง approved, อันหนึ่ง pending)
+  await prisma.menuItem.upsert({
+    where: { id: 'mnu_demo1' },
     update: {},
-    create: { vendorId: 'V001', current: 0 }
+    create: { id: 'mnu_demo1', vendorId: 'v001', name: 'ข้าวหมูแดง', price: 45, approved: true }
   });
-  await prisma.queueCounter.upsert({
-    where: { vendorId: 'V002' },
+  await prisma.menuItem.upsert({
+    where: { id: 'mnu_demo2' },
     update: {},
-    create: { vendorId: 'V002', current: 0 }
+    create: { id: 'mnu_demo2', vendorId: 'v001', name: 'บะหมี่เกี๊ยว', price: 50, approved: false }
   });
 
-  console.log('Seed complete');
+  console.log('Done.');
 }
-
-main().finally(()=>prisma.$disconnect());
+main().finally(() => prisma.$disconnect());
